@@ -6,13 +6,13 @@
     <LangVersion>12</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>FluxJson.Core</PackageId>
     <Version>0.1.0-alpha</Version>
-    <Authors>Your Name</Authors>
+    <Authors>mkenki</Authors>
     <Description>High-performance, modern JSON serialization library for .NET</Description>
     <PackageTags>json;serialization;performance;dotnet</PackageTags>
-    <RepositoryUrl>https://github.com/yourusername/FluxJson</RepositoryUrl>
+    <RepositoryUrl>https://github.com/mkenki/FluxJson</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     
