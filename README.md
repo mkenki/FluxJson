@@ -1,6 +1,6 @@
 # FluxJson 🚀
 
-[![Build Status](https://github.com/yourusername/FluxJson/workflows/CI/badge.svg)](https://github.com/yourusername/FluxJson/actions)
+[![Build Status](https://github.com/mkenki/FluxJson/workflows/CI/badge.svg)](https://github.com/mkenki/FluxJson/actions)
 [![NuGet Version](https://img.shields.io/nuget/v/FluxJson.Core.svg)](https://www.nuget.org/packages/FluxJson.Core/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
