@@ -96,4 +96,8 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file for
 
 ---
 
+<<<<<<< HEAD
 **Built with ❤️ for the .NET community.**
+=======
+**Built with ❤️ for the .
+>>>>>>> 508d4b4f8125e2354fe49d0f0dc27b9a12c1b410
