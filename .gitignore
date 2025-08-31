@@ -1,0 +1,43 @@
+## Build results
+bin/
+obj/
+artifacts/
+
+## User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+## Visual Studio
+.vs/
+
+## Rider
+.idea/
+
+## Test results
+TestResults/
+coverage/
+*.trx
+*.coverage
+*.coveragexml
+
+## NuGet
+*.nupkg
+*.snupkg
+packages/
+ci.yml
+
+## Benchmark results
+BenchmarkDotNet.Artifacts/
+
+## OS generated files
+.DS_Store
+Thumbs.db
