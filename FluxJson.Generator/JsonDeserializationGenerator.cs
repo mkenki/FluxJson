@@ -400,9 +400,9 @@ namespace FluxJson.Generator
             else if (underlyingType.TypeKind == TypeKind.Class && underlyingType is INamedTypeSymbol namedClassType && namedClassType.AllInterfaces.Any(i => i.IsGenericType && i.ConstructedFrom.ToDisplayString().StartsWith("FluxJson.Core.IJsonSerializable<")))
             {
                 if (dictionaryKey != null)
-                    sb.AppendLine($"{currentIndent}{assignmentTarget}Json.FromJsonSerializable<{underlyingType.ToDisplayString()}>({readerAccessor});");
+                    sb.AppendLine($"{currentIndent}{assignmentTarget}{underlyingType.Name}.FromJson({readerAccessor})!;");
                 else
-                    sb.AppendLine($"{currentIndent}{assignmentTarget}Json.FromJsonSerializable<{underlyingType.ToDisplayString()}>({readerAccessor}));");
+                    sb.AppendLine($"{currentIndent}{assignmentTarget}{underlyingType.Name}.FromJson({readerAccessor}));");
                 // FromJsonSerializable already handles advancing the reader past the object
             }
             else

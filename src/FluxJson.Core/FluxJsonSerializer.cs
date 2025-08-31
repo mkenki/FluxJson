@@ -493,6 +493,9 @@ public sealed class FluxJsonSerializer : IJsonSerializer
         // Check for custom converters
         if (TryGetConverter(type, out var converter, property))
         {
+            // This is a placeholder for a proper fix.
+            // The previous reflection-based approach failed due to JsonReader being a ref struct.
+            // A more robust solution is needed here.
             if (converter is IJsonConverter<object> genericConverter && genericConverter.CanRead)
             {
                 return genericConverter.Read(ref reader, _config);
@@ -1020,10 +1023,13 @@ public sealed class FluxJsonSerializer : IJsonSerializer
     /// <returns><c>true</c> if a converter was found; otherwise, <c>false</c>.</returns>
     private bool TryGetConverter(Type type, out IJsonConverter? converter, PropertyInfo? property = null)
     {
+        converter = null;
+
         // 1. Check for property-specific converters registered via fluent API
         if (property != null && _config.PropertyConverters.TryGetValue(property.DeclaringType!, out var propertyMap) &&
-            propertyMap.TryGetValue(property.Name, out converter))
+            propertyMap.TryGetValue(property.Name, out var propConverter))
         {
+            converter = propConverter;
             return true;
         }
 

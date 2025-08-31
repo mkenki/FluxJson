@@ -86,7 +86,7 @@ namespace FluxJson.Generator
             }
             else if (type.TypeKind == TypeKind.Class && type is INamedTypeSymbol namedClassType && namedClassType.AllInterfaces.Any(i => i.IsGenericType && i.ConstructedFrom.ToDisplayString().StartsWith("FluxJson.Core.IJsonSerializable<")))
             {
-                sb.AppendLine($"{indent}Json.ToJson({valueAccessor}, ref writer);");
+                sb.AppendLine($"{indent}{valueAccessor}.ToJson(ref writer);");
             }
             else if (type is IArrayTypeSymbol arrayType)
             {
@@ -196,7 +196,7 @@ namespace FluxJson.Generator
             }
             else if (underlyingType.TypeKind == TypeKind.Class && underlyingType is INamedTypeSymbol namedClassType && namedClassType.AllInterfaces.Any(i => i.IsGenericType && i.ConstructedFrom.ToDisplayString().StartsWith("FluxJson.Core.IJsonSerializable<")))
             {
-                sb.AppendLine($"{indent}Json.ToJson({valueAccessor}, ref writer);");
+                sb.AppendLine($"{indent}{valueAccessor}.ToJson(ref writer);");
             }
             else if (underlyingType is IArrayTypeSymbol arrayType)
             {
