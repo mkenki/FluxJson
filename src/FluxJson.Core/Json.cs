@@ -4,7 +4,7 @@ using System.Reflection;
 using FluxJson.Core;
 using FluxJson.Core.Serialization;
 
-namespace FluxJson
+namespace FluxJson.Core
 {
     public static class Json
     {
@@ -18,9 +18,14 @@ namespace FluxJson
             return new DefaultJsonBuilder<T>(obj);
         }
 
-        public static Core.JsonParser Parse(string json)
+        public static JsonParser Parse(string json)
         {
-            return new Core.JsonParser(json);
+            return new JsonParser(json);
+        }
+
+        public static JsonParser Parse(ReadOnlySpan<byte> jsonBytes)
+        {
+            return new JsonParser(jsonBytes);
         }
 
         private static bool IsSourceGeneratedType<T>()
@@ -42,12 +47,6 @@ namespace FluxJson
                    (type.IsGenericType && type.Name.StartsWith("<>"));
         }
 
-        public static T FromJsonSerializable<T>(global::FluxJson.Core.JsonReader reader) where T : class, new()
-        {
-            T instance = new T();
-            // TODO: Implement deserialization logic here
-            return instance;
-        }
 
         public static string Serialize<T>(T obj)
         {

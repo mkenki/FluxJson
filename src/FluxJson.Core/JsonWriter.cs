@@ -17,6 +17,8 @@ public ref struct JsonWriter
     private int _position;
     private readonly JsonConfiguration _config;
     private int _indentLevel;
+    private bool _isFirstProperty;
+    private bool _isNewLine;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JsonWriter"/> struct.
@@ -29,6 +31,8 @@ public ref struct JsonWriter
         _position = 0;
         _config = config;
         _indentLevel = 0;
+        _isFirstProperty = true;
+        _isNewLine = false;
     }
 
     /// <summary>
@@ -50,11 +54,13 @@ public ref struct JsonWriter
     /// </summary>
     public void WriteStartObject()
     {
-        WriteByte((byte)'{');
         if (_config.WriteIndented)
         {
-            _indentLevel++;
+            WriteNewLineAndIndent();
         }
+        WriteByte((byte)'{');
+        _indentLevel++;
+        _isFirstProperty = true;
     }
 
     /// <summary>
@@ -62,9 +68,9 @@ public ref struct JsonWriter
     /// </summary>
     public void WriteEndObject()
     {
+        _indentLevel--;
         if (_config.WriteIndented)
         {
-            _indentLevel--;
             WriteNewLineAndIndent();
         }
         WriteByte((byte)'}');
@@ -75,11 +81,12 @@ public ref struct JsonWriter
     /// </summary>
     public void WriteStartArray()
     {
-        WriteByte((byte)'[');
         if (_config.WriteIndented)
         {
-            _indentLevel++;
+            WriteNewLineAndIndent();
         }
+        WriteByte((byte)'[');
+        _indentLevel++;
     }
 
     /// <summary>
@@ -87,9 +94,9 @@ public ref struct JsonWriter
     /// </summary>
     public void WriteEndArray()
     {
+        _indentLevel--;
         if (_config.WriteIndented)
         {
-            _indentLevel--;
             WriteNewLineAndIndent();
         }
         WriteByte((byte)']');
@@ -101,6 +108,11 @@ public ref struct JsonWriter
     /// <param name="name">The name of the property.</param>
     public void WritePropertyName(ReadOnlySpan<char> name)
     {
+        if (!_isFirstProperty)
+        {
+            WriteByte((byte)',');
+        }
+
         if (_config.WriteIndented)
         {
             WriteNewLineAndIndent();
@@ -112,7 +124,11 @@ public ref struct JsonWriter
         WriteByte((byte)':');
 
         if (_config.WriteIndented)
+        {
             WriteByte((byte)' ');
+        }
+
+        _isFirstProperty = false;
     }
 
     /// <summary>
@@ -130,12 +146,14 @@ public ref struct JsonWriter
     /// <param name="value">The string value to write.</param>
     public void WriteString(ReadOnlySpan<char> value)
     {
-        var maxByteCount = _config.Encoding.GetMaxByteCount(value.Length);
+        var maxByteCount = value.Length; // For ASCII, 1 byte per char
         if (maxByteCount > Remaining)
             throw new InvalidOperationException($"Buffer overflow at position {_position}");
 
-        var bytesWritten = _config.Encoding.GetBytes(value, _buffer[_position..]);
-        _position += bytesWritten;
+        for (int i = 0; i < value.Length; i++)
+        {
+            WriteByte((byte)value[i]);
+        }
     }
 
     /// <summary>
@@ -313,13 +331,20 @@ public ref struct JsonWriter
         if (_position >= _buffer.Length)
             throw new InvalidOperationException($"Buffer overflow at position {_position}");
 
+        if (_isNewLine)
+        {
+            for (int i = 0; i < _indentLevel * 2; i++)
+            {
+                if (_position >= _buffer.Length)
+                    throw new InvalidOperationException($"Buffer overflow at position {_position}");
+                _buffer[_position++] = (byte)' ';
+            }
+            _isNewLine = false;
+        }
+
         _buffer[_position++] = value;
     }
 
-    /// <summary>
-    /// Writes a span of bytes to the buffer.
-    /// </summary>
-    /// <param name="bytes">The bytes to write.</param>
     /// <summary>
     /// Writes a span of bytes to the buffer.
     /// </summary>
@@ -353,12 +378,12 @@ public ref struct JsonWriter
     /// <summary>
     /// Writes a new line and indents the output based on the current indentation level.
     /// </summary>
-    private void WriteNewLineAndIndent()
+    internal void WriteNewLineAndIndent()
     {
-        WriteByte((byte)'\n');
-        for (int i = 0; i < _indentLevel * 2; i++)
+        if (_position > 0) // Don't write a newline at the very beginning
         {
-            WriteByte((byte)' ');
+            WriteByte((byte)'\n');
+            _isNewLine = true;
         }
     }
 

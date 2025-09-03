@@ -52,6 +52,17 @@ public ref struct JsonReader
     public readonly JsonTokenType TokenType => _tokenType;
 
     /// <summary>
+    /// Helper to get context around a position for debugging.
+    /// </summary>
+    private readonly string GetContext(int position, int length)
+    {
+        if (position < 0 || position >= _buffer.Length) return string.Empty;
+        int start = Math.Max(0, position - length / 2);
+        int end = Math.Min(_buffer.Length, position + length / 2);
+        return _config.Encoding.GetString(_buffer.Slice(start, end - start));
+    }
+
+    /// <summary>
     /// Reads the start of a JSON array ('[').
     /// </summary>
     /// <exception cref="JsonException">Thrown if the current token is not a StartArray.</exception>
@@ -134,17 +145,61 @@ public ref struct JsonReader
         if (Current == (byte)'"')
         {
             _position++; // Skip opening quote
+            int startPos = _position;
             var propertyName = ReadStringContent();
             SkipWhitespace();
-            if (Current == (byte)':')
-            {
-                _position++; // Skip colon
-                _tokenType = JsonTokenType.PropertyName;
-                return propertyName;
-            }
-            throw new JsonException($"Expected ':' after property name at position {_position}");
+            // Do not skip colon here; it will be skipped by the generator's deserialization logic.
+            _tokenType = JsonTokenType.PropertyName;
+            return propertyName;
+        }
+        // More specific error messages for common parsing issues
+        if (Current == (byte)'{')
+        {
+            throw new JsonException($"Expected property name (string) but found start of object '{{' at position {_position}. This often indicates a missing property name or incorrect parsing state in the deserializer.");
+        }
+        if (Current == (byte)'[')
+        {
+            throw new JsonException($"Expected property name (string) but found start of array '[' at position {_position}. This often indicates a missing property name or incorrect parsing state in the deserializer.");
         }
         throw new JsonException($"Expected property name (string) at position {_position}");
+    }
+
+    /// <summary>
+    /// Peeks at the next JSON token type without advancing the reader's position.
+    /// </summary>
+    /// <returns>The type of the next JSON token.</returns>
+    public JsonTokenType PeekNextTokenType()
+    {
+        int originalPosition = _position;
+        SkipWhitespace();
+        JsonTokenType type;
+        switch (Current)
+        {
+            case (byte)'{': type = JsonTokenType.StartObject; break;
+            case (byte)'[': type = JsonTokenType.StartArray; break;
+            case (byte)'"': type = JsonTokenType.String; break; // Could be property name or string value
+            case (byte)'-':
+            case (byte)'0':
+            case (byte)'1':
+            case (byte)'2':
+            case (byte)'3':
+            case (byte)'4':
+            case (byte)'5':
+            case (byte)'6':
+            case (byte)'7':
+            case (byte)'8':
+            case (byte)'9': type = JsonTokenType.Number; break;
+            case (byte)'t': type = JsonTokenType.True; break;
+            case (byte)'f': type = JsonTokenType.False; break;
+            case (byte)'n': type = JsonTokenType.Null; break;
+            case (byte)',': type = JsonTokenType.Comma; break;
+            case (byte)':': type = JsonTokenType.Colon; break;
+            case (byte)']': type = JsonTokenType.EndArray; break;
+            case (byte)'}': type = JsonTokenType.EndObject; break;
+            default: type = JsonTokenType.None; break;
+        }
+        _position = originalPosition; // Restore original position
+        return type;
     }
 
     /// <summary>
@@ -390,7 +445,42 @@ public ref struct JsonReader
 
     private string ReadStringContent()
     {
-        var start = _position;
+        var startContent = _position;
+        int endContent = -1;
+        int firstEscape = -1;
+
+        // Find the end of the string content and the first escape character
+        for (int i = startContent; i < _buffer.Length; i++)
+        {
+            byte b = _buffer[i];
+            if (b == (byte)'"')
+            {
+                endContent = i;
+                break;
+            }
+            if (b == (byte)'\\')
+            {
+                firstEscape = i;
+                // Skip the escaped character to avoid misinterpreting it as the end of the string
+                i++;
+                if (i >= _buffer.Length)
+                    throw new JsonException($"Unterminated escape sequence at position {i}");
+            }
+        }
+
+        if (endContent == -1)
+            throw new JsonException($"Unterminated string at position {_position}");
+
+        // Advance position past the closing quote
+        _position = endContent + 1;
+
+        // If no escapes were found, we can directly decode the slice
+        if (firstEscape == -1)
+        {
+            return _config.Encoding.GetString(_buffer.Slice(startContent, endContent - startContent));
+        }
+
+        // If escapes are present, we need to build the string character by character
         var charPool = ArrayPool<char>.Shared;
         char[]? rentedBuffer = null;
         Span<char> charBuffer = Span<char>.Empty;
@@ -398,36 +488,19 @@ public ref struct JsonReader
 
         try
         {
-            // Estimate buffer size (worst case: all chars are escaped, or unicode escapes)
-            var estimatedLength = _buffer.Length - _position;
-            if (estimatedLength > 0)
-            {
-                rentedBuffer = charPool.Rent(estimatedLength);
-                charBuffer = rentedBuffer.AsSpan();
-            }
+            // Estimate buffer size (worst case: no escapes reduce length)
+            var estimatedLength = endContent - startContent;
+            rentedBuffer = charPool.Rent(estimatedLength);
+            charBuffer = rentedBuffer.AsSpan();
 
-            while (_position < _buffer.Length)
+            _position = startContent; // Reset position to start of content for detailed parsing
+
+            while (_position < endContent)
             {
                 var b = _buffer[_position];
-                if (b == (byte)'"')
-                {
-                    _position++; // Skip closing quote
-                    if (charWritten == 0)
-                    {
-                        // No escapes, no content written to charBuffer, return direct string from byte buffer
-                        return _config.Encoding.GetString(_buffer[start..(_position - 1)]);
-                    }
-                    else
-                    {
-                        return new string(charBuffer[..charWritten]);
-                    }
-                }
-                else if (b == (byte)'\\')
+                if (b == (byte)'\\')
                 {
                     _position++; // Skip escape character
-                    if (_position >= _buffer.Length)
-                        throw new JsonException($"Unterminated escape sequence at position {_position}");
-
                     var escaped = _buffer[_position];
                     char decodedChar;
                     switch (escaped)
@@ -450,9 +523,8 @@ public ref struct JsonReader
 
                     if (charWritten >= charBuffer.Length)
                     {
-                        // This should ideally not happen with a good initial estimate, but handle if it does
-                        // For simplicity, we'll throw, but in a real scenario, you'd resize the buffer.
-                        throw new JsonException($"Buffer too small for unescaped string at position {_position}. Consider increasing initial buffer size.");
+                        // This should not happen with a good estimate, but as a safeguard
+                        throw new JsonException($"Buffer too small for unescaped string at position {_position}.");
                     }
                     charBuffer[charWritten++] = decodedChar;
                     _position++;
@@ -460,22 +532,19 @@ public ref struct JsonReader
                 else
                 {
                     // Non-escaped character
-                    // If we haven't started writing to charBuffer yet, and we encounter a non-escape char,
-                    // we need to copy the preceding non-escaped bytes to charBuffer first.
-                    if (charWritten == 0 && _position > start)
-                    {
-                        var nonEscapedBytes = _buffer[start.._position];
-                        charWritten += _config.Encoding.GetChars(nonEscapedBytes, charBuffer[charWritten..]);
-                    }
-
                     if (charWritten >= charBuffer.Length)
                     {
-                        throw new JsonException($"Buffer too small for unescaped string at position {_position}. Consider increasing initial buffer size.");
+                        throw new JsonException($"Buffer too small for unescaped string at position {_position}.");
                     }
                     charBuffer[charWritten++] = (char)b; // Assuming ASCII for direct cast, otherwise use encoding
                     _position++;
                 }
             }
+
+            // Ensure position is advanced past the closing quote
+            _position = endContent + 1;
+
+            return new string(charBuffer[..charWritten]);
         }
         finally
         {
@@ -484,8 +553,6 @@ public ref struct JsonReader
                 charPool.Return(rentedBuffer);
             }
         }
-
-        throw new JsonException($"Unterminated string at position {_position}");
     }
 
     private char ReadUnicodeEscape()
@@ -528,10 +595,24 @@ public ref struct JsonReader
         if (Current == (byte)'-')
             _position++;
 
-        // Read digits
-        while (_position < _buffer.Length && IsDigit(_buffer[_position]))
+        // Read digits until we hit a non-digit or JSON terminator
+        while (_position < _buffer.Length)
         {
-            _position++;
+            var b = _buffer[_position];
+            if (IsDigit(b))
+            {
+                _position++;
+            }
+            else if (IsJsonTerminator(b))
+            {
+                // Stop at JSON terminators (don't consume them)
+                break;
+            }
+            else
+            {
+                // Invalid character for integer
+                throw new JsonException($"Invalid character '{(char)b}' in integer at position {_position}");
+            }
         }
 
         var numberSpan = _buffer[start.._position];
@@ -557,10 +638,24 @@ public ref struct JsonReader
         if (Current == (byte)'-')
             _position++;
 
-        // Read digits
-        while (_position < _buffer.Length && IsDigit(_buffer[_position]))
+        // Read digits until we hit a non-digit or JSON terminator
+        while (_position < _buffer.Length)
         {
-            _position++;
+            var b = _buffer[_position];
+            if (IsDigit(b))
+            {
+                _position++;
+            }
+            else if (IsJsonTerminator(b))
+            {
+                // Stop at JSON terminators (don't consume them)
+                break;
+            }
+            else
+            {
+                // Invalid character for integer
+                throw new JsonException($"Invalid character '{(char)b}' in integer at position {_position}");
+            }
         }
 
         var numberSpan = _buffer[start.._position];
@@ -594,9 +689,15 @@ public ref struct JsonReader
             {
                 _position++;
             }
+            else if (IsJsonTerminator(b))
+            {
+                // Stop at JSON terminators (don't consume them)
+                break;
+            }
             else
             {
-                break;
+                // Invalid character for number
+                throw new JsonException($"Invalid character '{(char)b}' in number at position {_position}");
             }
         }
 
@@ -631,9 +732,15 @@ public ref struct JsonReader
             {
                 _position++;
             }
+            else if (IsJsonTerminator(b))
+            {
+                // Stop at JSON terminators (don't consume them)
+                break;
+            }
             else
             {
-                break;
+                // Invalid character for number
+                throw new JsonException($"Invalid character '{(char)b}' in number at position {_position}");
             }
         }
 
@@ -668,9 +775,15 @@ public ref struct JsonReader
             {
                 _position++;
             }
+            else if (IsJsonTerminator(b))
+            {
+                // Stop at JSON terminators (don't consume them)
+                break;
+            }
             else
             {
-                break;
+                // Invalid character for decimal
+                throw new JsonException($"Invalid character '{(char)b}' in decimal at position {_position}");
             }
         }
 
@@ -686,42 +799,10 @@ public ref struct JsonReader
     /// <summary>
     /// Skips over any whitespace characters in the JSON buffer.
     /// </summary>
-    /// <summary>
-    /// Skips over any whitespace characters in the JSON buffer.
-    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SkipWhitespace()
     {
-        if (Sse2.IsSupported && _buffer.Length - _position >= Vector128<byte>.Count)
-        {
-            var whitespaceMask = Vector128.Create((byte)' ', (byte)'\t', (byte)'\n', (byte)'\r', (byte)' ', (byte)'\t', (byte)'\n', (byte)'\r', (byte)' ', (byte)'\t', (byte)'\n', (byte)'\r', (byte)' ', (byte)'\t', (byte)'\n', (byte)'\r');
-            while (_position <= _buffer.Length - Vector128<byte>.Count)
-            {
-                // Use Unsafe.AsRef(in ...) for ReadOnlySpan
-                var vector = Vector128.LoadUnsafe(ref Unsafe.AsRef(in _buffer[_position]));
-                var eqSpace = Sse2.CompareEqual(vector, Vector128.Create((byte)' '));
-                var eqTab = Sse2.CompareEqual(vector, Vector128.Create((byte)'\t'));
-                var eqLf = Sse2.CompareEqual(vector, Vector128.Create((byte)'\n'));
-                var eqCr = Sse2.CompareEqual(vector, Vector128.Create((byte)'\r'));
-
-                var isWhitespace = Sse2.Or(Sse2.Or(eqSpace, eqTab), Sse2.Or(eqLf, eqCr));
-                var mask = Sse2.MoveMask(isWhitespace);
-
-                if (mask == 0xFFFF) // All 16 bytes are whitespace
-                {
-                    _position += Vector128<byte>.Count;
-                }
-                else
-                {
-                    // Find the first non-whitespace character within the vector
-                    var trailingZeros = BitOperations.TrailingZeroCount(~mask);
-                    _position += trailingZeros;
-                    return;
-                }
-            }
-        }
-
-        // Fallback for remaining bytes or if SIMD is not supported
+        // Simple fallback implementation to avoid SIMD issues
         while (_position < _buffer.Length && IsWhitespace(_buffer[_position]))
         {
             _position++;
@@ -744,6 +825,9 @@ public ref struct JsonReader
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsDigit(byte b) => b >= (byte)'0' && b <= (byte)'9';
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsJsonTerminator(byte b) => b is (byte)'}' or (byte)']' or (byte)',' or (byte)' ' or (byte)'\t' or (byte)'\n' or (byte)'\r';
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool ContainsEscapes(ReadOnlySpan<byte> bytes)

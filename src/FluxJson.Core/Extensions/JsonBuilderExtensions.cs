@@ -40,15 +40,8 @@ namespace FluxJson.Core.Extensions
         public static int ToSpan<T>(this JsonBuilder<T> builder, Span<byte> span)
         {
             var config = builder.GetConfiguration();
-            var writer = new JsonWriter(span, config);
             var serializer = new FluxJsonSerializer(config);
-            // Bu varsayımsal bir metottur. FluxJsonSerializer'da böyle bir metot olmalı.
-            // serializer.Serialize(writer, builder.GetObject()); 
-            // Gecici cozum:
-            var json = builder.ToJson();
-            var bytes = System.Text.Encoding.UTF8.GetBytes(json);
-            bytes.CopyTo(span);
-            return bytes.Length;
+            return serializer.SerializeToSpan(builder.GetObject(), span);
         }
     }
 }

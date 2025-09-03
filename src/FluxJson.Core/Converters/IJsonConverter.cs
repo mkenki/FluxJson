@@ -21,6 +21,23 @@ public interface IJsonConverter
     /// Gets a value indicating whether this converter can write JSON.
     /// </summary>
     bool CanWrite { get; }
+
+    /// <summary>
+    /// Writes the JSON representation of the object.
+    /// </summary>
+    /// <param name="writer">The <see cref="JsonWriter"/> to write to.</param>
+    /// <param name="value">The value to write.</param>
+    /// <param name="config">The JSON configuration.</param>
+    void Write(ref JsonWriter writer, object? value, JsonConfiguration config);
+
+    /// <summary>
+    /// Reads the JSON representation of the object.
+    /// </summary>
+    /// <param name="reader">The <see cref="JsonReader"/> to read from.</param>
+    /// <param name="type">The type to deserialize.</param>
+    /// <param name="config">The JSON configuration.</param>
+    /// <returns>The object value.</returns>
+    object? Read(ref JsonReader reader, Type type, JsonConfiguration config);
 }
 
 /// <summary>

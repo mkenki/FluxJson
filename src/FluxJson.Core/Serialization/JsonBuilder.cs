@@ -20,5 +20,7 @@ namespace FluxJson.Core.Serialization
 
         // ToSpan extension methodunun _config alanına erişebilmesi için bu metodu ekliyoruz.
         public JsonConfiguration GetConfiguration() => _config;
+
+        public T GetObject() => _object;
     }
 }

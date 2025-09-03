@@ -1,6 +1,7 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
-using FluxJson;
+using FluxJson.Core;
+using FluxJson.Core.Extensions;
 
 namespace FluxJson.Benchmarks;
 

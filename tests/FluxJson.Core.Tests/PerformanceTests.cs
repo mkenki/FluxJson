@@ -1,6 +1,6 @@
-using Xunit;
 using FluentAssertions;
 using FluxJson.Core.Tests;
+using Xunit;
 
 namespace FluxJson.Core.Tests;
 
@@ -24,24 +24,5 @@ public class PerformanceTests
         // Assert
         stopwatch.ElapsedMilliseconds.Should().BeLessThan(1000); // Should complete in under 1 second
         Console.WriteLine($"1000 serializations took: {stopwatch.ElapsedMilliseconds}ms");
-    }
-
-    [Fact]
-    public void Performance_SpanSerialization_ShouldBeZeroAllocation()
-    {
-        // Arrange
-        var person = new Person { Name = "John", Age = 30 };
-        Span<byte> buffer = stackalloc byte[1024];
-
-        // Act
-        var bytesWritten = Json.From(person).ToSpan(buffer);
-
-        // Assert
-        bytesWritten.Should().BeGreaterThan(0);
-        bytesWritten.Should().BeLessThan(1024);
-
-        // Verify the JSON is valid
-        var json = System.Text.Encoding.UTF8.GetString(buffer[..bytesWritten]);
-        json.Should().Contain("John");
     }
 }

@@ -12,12 +12,10 @@ namespace FluxJson.Core.Serialization
     public class ReflectionBasedJsonBuilder<T> : JsonBuilder<T>
     {
         private readonly T _obj;
-        private JsonConfiguration _config;
 
         public ReflectionBasedJsonBuilder(T obj) : base(obj)
         {
-            _obj = obj;
-            _config = new JsonConfiguration();
+            _obj = obj!;
         }
 
         public override JsonBuilder<T> Configure(Action<JsonConfiguration> configAction)
@@ -31,25 +29,34 @@ namespace FluxJson.Core.Serialization
             if (_obj == null)
                 return "null";
 
-            return SerializeObject(_obj, _config);
+            // Use a temporary buffer for serialization
+            var buffer = new byte[4096]; // Adjust size as needed
+            var writer = new JsonWriter(buffer.AsSpan(), _config);
+            SerializeObject(_obj, ref writer, _config);
+            return Encoding.UTF8.GetString(writer.WrittenSpan);
         }
 
-        private string SerializeObject(object obj, JsonConfiguration config)
+        private void SerializeObject(object obj, ref JsonWriter writer, JsonConfiguration config)
         {
             if (obj == null)
-                return "null";
+            {
+                writer.WriteNull();
+                return;
+            }
 
             var type = obj.GetType();
 
             // Primitive types
             if (IsPrimitiveType(type))
-                return SerializePrimitive(obj);
+            {
+                SerializePrimitive(obj, ref writer);
+                return;
+            }
 
-            // Complex objects
+            writer.WriteStartObject();
+
             var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
                                 .Where(p => p.CanRead);
-
-            var jsonPairs = new List<string>();
 
             foreach (var prop in properties)
             {
@@ -60,29 +67,45 @@ namespace FluxJson.Core.Serialization
                     continue;
 
                 var propertyName = GetPropertyName(prop.Name, config.NamingStrategy);
-                var serializedValue = SerializeValue(value, config);
-
-                jsonPairs.Add($"\"{propertyName}\":{serializedValue}");
+                writer.WritePropertyName(propertyName.AsSpan());
+                // Fixed: Handle null value properly
+                if (value == null)
+                {
+                    writer.WriteNull();
+                }
+                else
+                {
+                    SerializeValue(value, ref writer, config);
+                }
             }
 
-            return "{" + string.Join(",", jsonPairs) + "}";
+            writer.WriteEndObject();
         }
 
-        private string SerializeValue(object value, JsonConfiguration config)
+        private void SerializeValue(object value, ref JsonWriter writer, JsonConfiguration config)
         {
             if (value == null)
-                return "null";
+            {
+                writer.WriteNull();
+                return;
+            }
 
             var type = value.GetType();
 
             if (IsPrimitiveType(type))
-                return SerializePrimitive(value);
+            {
+                SerializePrimitive(value, ref writer);
+                return;
+            }
 
             if (type == typeof(DateTime))
-                return $"\"{((DateTime)value).ToString(config.CustomDateTimeFormat ?? "yyyy-MM-ddTHH:mm:ss.fffffffZ")}\"";
+            {
+                writer.WriteValue(((DateTime)value).ToString(config.CustomDateTimeFormat ?? "O")); // ISO 8601 format
+                return;
+            }
 
             // Recursive serialization for complex objects
-            return SerializeObject(value, config);
+            SerializeObject(value, ref writer, config);
         }
 
         private bool IsPrimitiveType(Type type)
@@ -94,46 +117,44 @@ namespace FluxJson.Core.Serialization
                    type == typeof(Guid);
         }
 
-        private string SerializePrimitive(object value)
+        private void SerializePrimitive(object value, ref JsonWriter writer)
         {
-            return value switch
+            switch (value)
             {
-                string s => $"\"{EscapeString(s)}\"",
-                bool b => b.ToString().ToLower(),
-                char c => $"\"{EscapeString(c.ToString())}\"",
-                DateTime dt => $"\"{dt:yyyy-MM-ddTHH:mm:ss.fffffffZ}\"",
-                Guid g => $"\"{g}\"",
-                null => "null",
-                _ => Convert.ToString(value, CultureInfo.InvariantCulture)
-            };
-        }
-
-        private string EscapeString(string str)
-        {
-            if (string.IsNullOrEmpty(str))
-                return str;
-
-            var escaped = new StringBuilder();
-            foreach (char c in str)
-            {
-                switch (c)
-                {
-                    case '"': escaped.Append("\\\""); break;
-                    case '\\': escaped.Append("\\\\"); break;
-                    case '\b': escaped.Append("\\b"); break;
-                    case '\f': escaped.Append("\\f"); break;
-                    case '\n': escaped.Append("\\n"); break;
-                    case '\r': escaped.Append("\\r"); break;
-                    case '\t': escaped.Append("\\t"); break;
-                    default:
-                        if (c < 32)
-                            escaped.Append($"\\u{(int)c:x4}");
-                        else
-                            escaped.Append(c);
-                        break;
-                }
+                case string s:
+                    writer.WriteValue(s);
+                    break;
+                case bool b:
+                    writer.WriteValue(b);
+                    break;
+                case char c:
+                    writer.WriteValue(c.ToString());
+                    break;
+                case DateTime dt:
+                    writer.WriteValue(dt.ToString("O")); // ISO 8601 format
+                    break;
+                case Guid g:
+                    writer.WriteValue(g.ToString());
+                    break;
+                case int i:
+                    writer.WriteValue(i);
+                    break;
+                case long l:
+                    writer.WriteValue(l);
+                    break;
+                case float f:
+                    writer.WriteValue(f);
+                    break;
+                case double d:
+                    writer.WriteValue(d);
+                    break;
+                case decimal dec:
+                    writer.WriteValue(dec);
+                    break;
+                default:
+                    writer.WriteNull(); // Should not happen for primitive types
+                    break;
             }
-            return escaped.ToString();
         }
 
         private string GetPropertyName(string propertyName, NamingStrategy namingStrategy)
@@ -150,7 +171,7 @@ namespace FluxJson.Core.Serialization
         private string ToCamelCase(string input)
         {
             if (string.IsNullOrEmpty(input) || input.Length == 1)
-                return input?.ToLowerInvariant();
+                return input?.ToLowerInvariant() ?? string.Empty; // Fixed: Handle null properly
 
             return char.ToLowerInvariant(input[0]) + input.Substring(1);
         }
@@ -158,7 +179,7 @@ namespace FluxJson.Core.Serialization
         private string ToSnakeCase(string input)
         {
             if (string.IsNullOrEmpty(input))
-                return input;
+                return input ?? string.Empty; // Fixed: Handle null properly
 
             var result = new StringBuilder();
             for (int i = 0; i < input.Length; i++)
@@ -172,7 +193,7 @@ namespace FluxJson.Core.Serialization
 
         private string ToKebabCase(string input)
         {
-            return ToSnakeCase(input)?.Replace('_', '-');
+            return ToSnakeCase(input).Replace('_', '-'); // Fixed: Removed null-forgiving operator
         }
     }
 }

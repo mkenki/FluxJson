@@ -1,10 +1,10 @@
 // src/FluxJson.Benchmarks/SerializationBenchmarks.cs
+using System.Text.Json;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
-using FluxJson.Benchmarks;
+using FluxJson.Core;
+using FluxJson.Core.Extensions;
 using Newtonsoft.Json;
-using System.Text.Json;
-using FluxJson;
 
 namespace FluxJson.Benchmarks;
 

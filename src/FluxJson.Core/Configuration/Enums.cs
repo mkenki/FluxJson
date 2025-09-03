@@ -138,6 +138,14 @@ public enum JsonTokenType
     /// </summary>
     Null,
     /// <summary>
+    /// A comma (',') separator.
+    /// </summary>
+    Comma,
+    /// <summary>
+    /// A colon (':') separator.
+    /// </summary>
+    Colon,
+    /// <summary>
     /// The end of the JSON data.
     /// </summary>
     EndOfDocument

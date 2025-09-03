@@ -1,8 +1,9 @@
 // tests/FluxJson.Core.Tests/FluentApiTests.cs
-using Xunit;
-using FluxJson.Core.Tests;
-using FluxJson.Core.Configuration;
 using FluentAssertions;
+using FluxJson.Core.Configuration;
+using FluxJson.Core.Extensions; // Add this using directive
+using FluxJson.Core.Tests;
+using Xunit;
 
 namespace FluxJson.Core.Tests;
 

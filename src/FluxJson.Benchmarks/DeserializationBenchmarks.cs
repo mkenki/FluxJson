@@ -1,7 +1,8 @@
 // src/FluxJson.Benchmarks/DeserializationBenchmarks.cs
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
-using FluxJson.Benchmarks;
+using FluxJson.Core;
+using FluxJson.Core.Extensions;
 using Newtonsoft.Json;
 
 namespace FluxJson.Benchmarks;
@@ -81,7 +82,7 @@ public class DeserializationBenchmarks
     public Person? FluxJson_DeserializePerson_Speed()
     {
         return Json.Parse(_personJson)
-            .WithPerformanceMode(FluxJson.Core.Configuration.PerformanceMode.Speed)
+            .Configure(config => config.WithPerformanceMode(FluxJson.Core.Configuration.PerformanceMode.Speed))
             .To<Person>();
     }
 

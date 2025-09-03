@@ -189,12 +189,11 @@ public sealed class FluxJsonSerializer : IJsonSerializer
     /// <summary>
     /// Writes a value to the JSON writer.
     /// </summary>
-    /// <typeparam name="T">The type of the value.</typeparam>
     /// <param name="writer">The JSON writer.</param>
     /// <param name="value">The value to write.</param>
     /// <param name="type">The type of the value.</param>
     /// <param name="property">Optional: The property being serialized.</param>
-    private void WriteValue<T>(ref JsonWriter writer, T value, Type type, PropertyInfo? property = null)
+    private void WriteValue(ref JsonWriter writer, object? value, Type type, PropertyInfo? property = null)
     {
         if (value is null)
         {
@@ -204,23 +203,24 @@ public sealed class FluxJsonSerializer : IJsonSerializer
         }
 
         // Check for custom converters first
-        if (TryGetConverter(type, out var converter, property))
+        Type actualType = value.GetType();
+        if (TryGetConverter(actualType, out var converter, property))
         {
-            if (converter is IJsonConverter<T> typedConverter && typedConverter.CanWrite)
+            if (converter != null && converter.CanWrite)
             {
-                typedConverter.Write(ref writer, value, _config);
+                converter.Write(ref writer, value, _config);
                 return;
             }
         }
 
         // Handle primitive types
-        switch (Type.GetTypeCode(type))
+        switch (Type.GetTypeCode(actualType))
         {
             case TypeCode.String:
-                writer.WriteValue((string)(object)value);
+                writer.WriteValue((string)value);
                 break;
             case TypeCode.Boolean:
-                writer.WriteValue((bool)(object)value);
+                writer.WriteValue((bool)value);
                 break;
             case TypeCode.Byte:
             case TypeCode.SByte:
@@ -244,10 +244,10 @@ public sealed class FluxJsonSerializer : IJsonSerializer
                 writer.WriteValue(Convert.ToDecimal(value));
                 break;
             case TypeCode.DateTime:
-                WriteDateTime(ref writer, (DateTime)(object)value);
+                WriteDateTime(ref writer, (DateTime)value);
                 break;
             default:
-                WriteComplexValue(ref writer, value, type);
+                WriteComplexValue(ref writer, value, actualType);
                 break;
         }
     }
@@ -255,11 +255,10 @@ public sealed class FluxJsonSerializer : IJsonSerializer
     /// <summary>
     /// Writes a complex value (non-primitive, non-string) to the JSON writer.
     /// </summary>
-    /// <typeparam name="T">The type of the value.</typeparam>
     /// <param name="writer">The JSON writer.</param>
     /// <param name="value">The value to write.</param>
     /// <param name="type">The type of the value.</param>
-    private void WriteComplexValue<T>(ref JsonWriter writer, T value, Type type)
+    private void WriteComplexValue(ref JsonWriter writer, object? value, Type type)
     {
         // Handle nullable types
         if (IsNullableType(type))
@@ -299,7 +298,7 @@ public sealed class FluxJsonSerializer : IJsonSerializer
             }
             else
             {
-                writer.WriteValue(((Guid)(object)value).ToString());
+                writer.WriteValue(((Guid)value).ToString());
             }
             return;
         }
@@ -308,7 +307,7 @@ public sealed class FluxJsonSerializer : IJsonSerializer
         if (type == typeof(DateTimeOffset))
         {
             if (value is not null)
-                WriteDateTimeOffset(ref writer, (DateTimeOffset)(object)value);
+                WriteDateTimeOffset(ref writer, (DateTimeOffset)value);
             else
                 writer.WriteNull();
             return;
@@ -334,6 +333,10 @@ public sealed class FluxJsonSerializer : IJsonSerializer
     private void WriteArray(ref JsonWriter writer, IEnumerable enumerable, Type type)
     {
         writer.WriteStartArray();
+        if (_config.WriteIndented)
+        {
+            writer.WriteNewLineAndIndent();
+        }
 
         var isFirst = true;
         var elementType = GetCollectionElementType(type);
@@ -341,7 +344,10 @@ public sealed class FluxJsonSerializer : IJsonSerializer
         foreach (var item in enumerable)
         {
             if (!isFirst)
+            {
                 writer.WriteSeparator();
+                writer.WriteNewLineAndIndent();
+            }
 
             WriteValue(ref writer, item, elementType, property: null); // No direct property context for array items
             isFirst = false;
@@ -377,16 +383,16 @@ public sealed class FluxJsonSerializer : IJsonSerializer
     /// <summary>
     /// Writes an object's properties to the JSON writer.
     /// </summary>
-    /// <typeparam name="T">The type of the object.</typeparam>
     /// <param name="writer">The JSON writer.</param>
     /// <param name="value">The object to write.</param>
     /// <param name="type">The type of the object.</param>
-    private void WriteObject<T>(ref JsonWriter writer, T value, Type type)
+    private void WriteObject(ref JsonWriter writer, object? value, Type type)
     {
-        writer.WriteStartObject();
+        writer.WriteStartObject(); // This handles the initial '{' and newline/indent if configured.
+                                   // JsonWriter's _isFirstProperty is set to true here.
 
         var properties = GetSerializableProperties(type);
-        var isFirst = true;
+        bool isFirstPropertyInObject = true; // Local flag for this object's properties
 
         foreach (var property in properties)
         {
@@ -396,14 +402,16 @@ public sealed class FluxJsonSerializer : IJsonSerializer
             if (propValue is null && _config.NullHandling == NullHandling.Ignore)
                 continue;
 
-            if (!isFirst)
-                writer.WriteSeparator();
+            if (!isFirstPropertyInObject)
+            {
+                writer.WriteSeparator(); // Writes ',' and then newline/indent if configured
+            }
 
             var propertyName = GetPropertyName(property.Name);
-            writer.WritePropertyName(propertyName);
+            writer.WritePropertyName(propertyName); // This will use JsonWriter's _isFirstProperty for its own indentation logic
 
             WriteValue(ref writer, propValue, property.PropertyType, property);
-            isFirst = false;
+            isFirstPropertyInObject = false; // After writing a property, it's no longer the first
         }
 
         writer.WriteEndObject();
@@ -447,11 +455,10 @@ public sealed class FluxJsonSerializer : IJsonSerializer
     /// <summary>
     /// Writes an enum value to the JSON writer as its string representation.
     /// </summary>
-    /// <typeparam name="T">The type of the enum.</typeparam>
     /// <param name="writer">The JSON writer.</param>
     /// <param name="value">The enum value to write.</param>
     /// <param name="type">The type of the enum.</param>
-    private void WriteEnum<T>(ref JsonWriter writer, T value, Type type)
+    private void WriteEnum(ref JsonWriter writer, object? value, Type type)
     {
         // Convert enum to string representation
         var enumString = value?.ToString() ?? "null";
@@ -469,9 +476,6 @@ public sealed class FluxJsonSerializer : IJsonSerializer
         return (T?)ReadValue(ref reader, typeof(T));
     }
 
-    /// <summary>
-    /// Reads a JSON value and deserializes it into an object of the specified type.
-    /// </summary>
     /// <summary>
     /// Reads a JSON value and deserializes it into an object of the specified type.
     /// </summary>
@@ -493,12 +497,9 @@ public sealed class FluxJsonSerializer : IJsonSerializer
         // Check for custom converters
         if (TryGetConverter(type, out var converter, property))
         {
-            // This is a placeholder for a proper fix.
-            // The previous reflection-based approach failed due to JsonReader being a ref struct.
-            // A more robust solution is needed here.
-            if (converter is IJsonConverter<object> genericConverter && genericConverter.CanRead)
+            if (converter != null && converter.CanRead)
             {
-                return genericConverter.Read(ref reader, _config);
+                return converter.Read(ref reader, type, _config);
             }
         }
 
@@ -651,7 +652,7 @@ public sealed class FluxJsonSerializer : IJsonSerializer
                 break;
 
             // Read key
-            var keyString = reader.ReadString();
+            var keyString = reader.ReadPropertyName();
             if (keyString is null)
                 throw new JsonException($"Expected property name at position {reader.Position}");
 
@@ -673,6 +674,10 @@ public sealed class FluxJsonSerializer : IJsonSerializer
             if (reader.Current == (byte)',')
             {
                 reader.ReadNext(); // Skip ','
+            }
+            else if (reader.Current != (byte)'}')
+            {
+                throw new JsonException($"Expected ',' or '}}' at position {reader.Position}");
             }
         }
 
@@ -700,15 +705,41 @@ public sealed class FluxJsonSerializer : IJsonSerializer
         var instance = Activator.CreateInstance(type)!;
         var properties = GetSerializableProperties(type).ToDictionary(p => GetPropertyName(p.Name), p => p);
 
-        while (!reader.IsAtEnd && reader.Current != (byte)'}')
+        bool firstProperty = true; // Track if it's the first property
+
+        while (true) // Loop indefinitely, break when '}' is found or error
         {
             reader.SkipWhitespace();
 
             if (reader.Current == (byte)'}')
-                break;
+            {
+                reader.ReadNext(); // Skip '}'
+                break; // End of object
+            }
 
-            // Read property name
-            var propertyName = reader.ReadString();
+            // If not the first property, we expect a comma before the property name
+            if (!firstProperty)
+            {
+                if (reader.Current == (byte)',')
+                {
+                    reader.ReadNext(); // Skip ','
+                    reader.SkipWhitespace();
+
+                    // If trailing commas are allowed, we might be at the end of the object
+                    if (_config.AllowTrailingCommas && reader.Current == (byte)'}')
+                    {
+                        reader.ReadNext(); // Skip '}'
+                        break; // End of object
+                    }
+                }
+                else
+                {
+                    throw new JsonException($"Expected ',' or '}}' at position {reader.Position}");
+                }
+            }
+
+            // Now, expect a property name (string)
+            var propertyName = reader.ReadPropertyName();
             if (propertyName is null)
                 throw new JsonException($"Expected property name at position {reader.Position}");
 
@@ -718,6 +749,7 @@ public sealed class FluxJsonSerializer : IJsonSerializer
                 throw new JsonException($"Expected ':' after property name at position {reader.Position}");
 
             reader.ReadNext(); // Skip ':'
+            reader.SkipWhitespace(); // Skip whitespace after colon
 
             // Find matching property
             if ((properties.TryGetValue(propertyName, out var property) ||
@@ -733,16 +765,8 @@ public sealed class FluxJsonSerializer : IJsonSerializer
                 SkipValue(ref reader);
             }
 
-            reader.SkipWhitespace();
-
-            if (reader.Current == (byte)',')
-            {
-                reader.ReadNext(); // Skip ','
-            }
+            firstProperty = false; // After processing the first property, set this to false
         }
-
-        if (reader.Current == (byte)'}')
-            reader.ReadNext(); // Skip '}'
 
         return instance;
     }

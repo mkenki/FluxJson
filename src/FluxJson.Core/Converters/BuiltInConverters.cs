@@ -24,6 +24,36 @@ public sealed class DateTimeConverter : IJsonConverter<DateTime>
     public bool CanWrite => true;
 
     /// <summary>
+    /// Writes the JSON representation of the object.
+    /// </summary>
+    /// <param name="writer">The <see cref="JsonWriter"/> to write to.</param>
+    /// <param name="value">The value to write.</param>
+    /// <param name="config">The JSON configuration.</param>
+    public void Write(ref JsonWriter writer, object? value, JsonConfiguration config)
+    {
+        if (value is DateTime dateTimeValue)
+        {
+            Write(ref writer, dateTimeValue, config);
+        }
+        else
+        {
+            throw new ArgumentException($"Expected DateTime value, but got {value?.GetType().Name ?? "null"}");
+        }
+    }
+
+    /// <summary>
+    /// Reads the JSON representation of the object.
+    /// </summary>
+    /// <param name="reader">The <see cref="JsonReader"/> to read from.</param>
+    /// <param name="type">The type to deserialize.</param>
+    /// <param name="config">The JSON configuration.</param>
+    /// <returns>The object value.</returns>
+    public object? Read(ref JsonReader reader, Type type, JsonConfiguration config)
+    {
+        return Read(ref reader, config);
+    }
+
+    /// <summary>
     /// Writes the JSON representation of the <see cref="DateTime"/> object.
     /// </summary>
     /// <param name="writer">The <see cref="JsonWriter"/> to write to.</param>
@@ -83,6 +113,36 @@ public sealed class GuidConverter : IJsonConverter<Guid>
     /// Gets a value indicating whether this converter can write JSON.
     /// </summary>
     public bool CanWrite => true;
+
+    /// <summary>
+    /// Writes the JSON representation of the object.
+    /// </summary>
+    /// <param name="writer">The <see cref="JsonWriter"/> to write to.</param>
+    /// <param name="value">The value to write.</param>
+    /// <param name="config">The JSON configuration.</param>
+    public void Write(ref JsonWriter writer, object? value, JsonConfiguration config)
+    {
+        if (value is Guid guidValue)
+        {
+            Write(ref writer, guidValue, config);
+        }
+        else
+        {
+            throw new ArgumentException($"Expected Guid value, but got {value?.GetType().Name ?? "null"}");
+        }
+    }
+
+    /// <summary>
+    /// Reads the JSON representation of the object.
+    /// </summary>
+    /// <param name="reader">The <see cref="JsonReader"/> to read from.</param>
+    /// <param name="type">The type to deserialize.</param>
+    /// <param name="config">The JSON configuration.</param>
+    /// <returns>The object value.</returns>
+    public object? Read(ref JsonReader reader, Type type, JsonConfiguration config)
+    {
+        return Read(ref reader, config);
+    }
 
     /// <summary>
     /// Writes the JSON representation of the <see cref="Guid"/> object.
