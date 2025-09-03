@@ -4,13 +4,13 @@ Welcome to the comprehensive documentation for **FluxJson**, a modern, high-perf
 
 ## 📖 Documentation Structure
 
-### [🚀 Examples](./examples.md)
+### [🚀 Examples](./guides/examples.md)
 Practical examples covering basic usage, advanced scenarios, and real-world applications.
 
-### [⚙️ Configuration Guide](./configuration.md)
+### [⚙️ Configuration Guide](./guides/configuration.md)
 Detailed guide to all configuration options including naming strategies, null handling, date formats, and performance modes.
 
-### [🔧 API Reference](./api.md)
+### [🔧 API Reference](./guides/api.md)
 Complete API documentation for all public classes, interfaces, and methods.
 
 ### [🏗️ Architecture Overview](./architecture.md)
@@ -23,11 +23,11 @@ Migration guides for users coming from other JSON libraries (coming soon).
 
 | Category | Description |
 |----------|-------------|
-| **Examples** | [Basic Examples](./examples.md#basic-examples) |
-| **Advanced** | [Custom Converters](./examples.md#custom-converters), [Performance](./examples.md#performance-examples) |
-| **Web APIs** | [ASP.NET Core](./examples.md#asp-net-core-controller), [REST Patterns](./examples.md#consistent-api-response-format) |
-| **Configuration** | [Naming Strategies](./configuration.md#naming-strategies), [Null Handling](./configuration.md#null-handling) |
-| **API Classes** | [Json](./api.md#json-class), [FluxJsonSerializer](./api.md#fluxjsonserializer-class) |
+| **Examples** | [Basic Examples](./guides/examples.md#basic-examples) |
+| **Advanced** | [Custom Converters](./guides/examples.md#custom-converters), [Performance](./guides/examples.md#performance-examples) |
+| **Web APIs** | [ASP.NET Core](./guides/examples.md#asp-net-core-controller), [REST Patterns](./guides/examples.md#consistent-api-response-format) |
+| **Configuration** | [Naming Strategies](./guides/configuration.md#naming-strategies), [Null Handling](./guides/configuration.md#null-handling) |
+| **API Classes** | [Json](./guides/api.md#json-class), [FluxJsonSerializer](./guides/api.md#fluxjsonserializer-class) |
 *******
 
 ## 🏷️ Key Features Documented
