@@ -11,4 +11,8 @@
   <ItemGroup>
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="FluxJson.Core" Version="0.1.0-alpha" />
+  </ItemGroup>
+
 </Project>

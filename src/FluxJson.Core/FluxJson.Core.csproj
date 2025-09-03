@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>FluxJson.Core</PackageId>
-    <Version>0.1.0-alpha</Version>
+    <Version>0.1.1</Version>
     <Authors>mkenki</Authors>
     <Description>High-performance, modern JSON serialization library for .NET</Description>
     <PackageTags>json;serialization;performance;dotnet</PackageTags>
