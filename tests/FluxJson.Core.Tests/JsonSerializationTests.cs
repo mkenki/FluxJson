@@ -1,10 +1,10 @@
 // tests/FluxJson.Core.Tests/JsonSerializationTests.cs
-using Xunit;
 using FluentAssertions;
-using FluxJson.Core.Tests;
 using FluxJson.Core.Configuration;
-using FluxJson.Core.Fluent;
 using FluxJson.Core.Extensions;
+using FluxJson.Core.Fluent;
+using FluxJson.Core.Tests;
+using Xunit;
 
 namespace FluxJson.Core.Tests;
 
@@ -153,5 +153,20 @@ public class JsonSerializationTests
         bytesWritten.Should().BeGreaterThan(0);
         var json = System.Text.Encoding.UTF8.GetString(buffer[..bytesWritten]);
         json.Should().Contain("John");
+    }
+
+    [Fact]
+    public void Serialize_AnonymousObject_ShouldReturnValidJson()
+    {
+        // Arrange
+        var myObject = new { Name = "Alice", Age = 30 };
+
+        // Act
+        var json = Json.From(myObject).ToJson();
+
+        // Assert
+        json.Should().NotBeNullOrEmpty();
+        json.Should().Contain("\"Name\":\"Alice\"");
+        json.Should().Contain("\"Age\":30");
     }
 }

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace FluxJson.Core
 {
     // [JsonSerializable]
-    public class TestClassForGenerator // : IJsonSerializable<TestClassForGenerator>
+    public partial class TestClassForGenerator // : IJsonSerializable<TestClassForGenerator>
     {
         // Force regeneration
         public int Id { get; set; }
@@ -31,7 +31,7 @@ namespace FluxJson.Core
     }
 
     // [JsonSerializable]
-    public class NestedClass // : IJsonSerializable<NestedClass>
+    public partial class NestedClass // : IJsonSerializable<NestedClass>
     {
         public string? NestedName { get; set; }
         public int NestedValue { get; set; }
